@@ -35,19 +35,23 @@ const buttonStyle = {
   fontSize: "16px",
 };
 
+// Types
 type Player = "X" | "O" | null | "--";
 type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
 function getBoardStyle(boardSize: number): React.CSSProperties {
+  const s = boardSize * 2 + 50;
   return {
     display: "grid",
     gridTemplateColumns: `repeat(${boardSize}, 1fr)`,
     gap: "4px",
-    width: "min(90vw, 500px)",
+
+    width: `min(${s}vw)`,
   };
 }
 
+// helpers
 function getSquareStyle(boardSize: number): React.CSSProperties {
   const fontSize = Math.max(12, Math.floor(160 / boardSize));
   return {
@@ -61,6 +65,10 @@ function getSquareStyle(boardSize: number): React.CSSProperties {
   };
 }
 
+function createEmptyBoard(size: number): Player[][] {
+  return Array.from({ length: size }, () => Array(size).fill(null));
+}
+
 function getWinner({
   board,
   boardSize,
@@ -68,6 +76,9 @@ function getWinner({
   board: Board;
   boardSize: number;
 }): Winner {
+  const firstCell = board[0][0];
+  const lastRowCell = board[boardSize - 1][0];
+
   for (let row = 0; row < boardSize; row++) {
     const firstRowCell = board[row][0];
     if (
@@ -89,27 +100,24 @@ function getWinner({
   }
 
   if (
-    board[0][0] !== null &&
-    board[0][0] !== "--" &&
-    board.every((row, col) => row[col] === board[0][0])
+    firstCell !== null &&
+    firstCell !== "--" &&
+    board.every((row, col) => row[col] === firstCell)
   ) {
-    return board[0][0];
+    return firstCell;
   }
   if (
-    board[0][boardSize - 1] !== null &&
-    board[0][boardSize - 1] !== "--" &&
-    board.every(
-      (row, col) => row[boardSize - 1 - col] === board[0][boardSize - 1]
-    )
+    lastRowCell !== null &&
+    lastRowCell !== "--" &&
+    board.every((row, col) => row[boardSize - 1 - col] === lastRowCell)
   ) {
-    return board[0][boardSize - 1];
+    return lastRowCell;
   }
 
   return "None";
 }
 
-// Components
-
+// components
 function Square({
   value,
   onClick,
@@ -133,9 +141,7 @@ function Board() {
   const [boardSize, setBoardSize] = useState(startingBoardSize);
 
   useEffect(() => {
-    setBoard(
-      Array.from({ length: boardSize }, () => Array(boardSize).fill(null))
-    );
+    setBoard(createEmptyBoard(boardSize));
   }, [boardSize]);
 
   const handleClick = (row: number, col: number) => {
@@ -151,16 +157,13 @@ function Board() {
   };
 
   const handleReset = () => {
-    setBoard(startingBoard);
+    setBoard(createEmptyBoard(boardSize));
     setPlayer(startingPlayer);
     setWinner(startingWinner);
   };
 
   const handleIncreaseBoard = () => {
     setBoardSize((prev) => Math.min(prev + 1, maxBoardSize));
-    setBoard(
-      Array.from({ length: boardSize }, () => Array(boardSize).fill(null))
-    );
   };
   const handleDecreaseBoard = () => {
     setBoardSize((prev) => Math.max(prev - 1, minBoardSize));
