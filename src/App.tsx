@@ -1,28 +1,30 @@
 import React, { useState } from "react";
 
-// Styles
-const rowStyle = {
-  display: "flex",
-};
+// CONSTANTS
+const BOARD_SIZE = 4;
+const startingBoard: Board = Array(BOARD_SIZE)
+  .fill(null)
+  .map(() => Array(BOARD_SIZE).fill(null));
+const startingPlayer = "X";
+const startingWinner = "None";
 
-const squareStyle = {
-  width: "60px",
-  height: "60px",
+// Styles
+
+const squareStyle: React.CSSProperties = {
+  aspectRatio: 1,
   backgroundColor: "#ddd",
-  margin: "4px",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  fontSize: "20px",
+  fontSize: "clamp(16px, 4vw, 24px",
   color: "white",
 };
 
-const boardStyle = {
-  backgroundColor: "#eee",
-  width: "208px",
-  display: "flex",
-  flexDirection: "column" as const,
-  border: "3px #eee solid",
+const boardStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`,
+  gap: "4px",
+  width: "min(90vw, 500px",
 };
 
 const containerStyle = {
@@ -51,14 +53,6 @@ const buttonStyle = {
 type Player = "X" | "O" | null | "--";
 type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
-
-// CONSTANTS
-const BOARD_SIZE = 4;
-const startingBoard: Board = Array(BOARD_SIZE)
-  .fill(null)
-  .map(() => Array(BOARD_SIZE).fill(null));
-const startingPlayer = "X";
-const startingWinner = "None";
 
 function getWinner(board: Board): Winner {
   for (let row = 0; row < BOARD_SIZE; row++) {
@@ -103,9 +97,17 @@ function getWinner(board: Board): Winner {
 
 // Components
 
-function Square({ value, onClick }: { value: Player; onClick: () => void }) {
+function Square({
+  value,
+  onClick,
+  style,
+}: {
+  value: Player;
+  onClick: () => void;
+  style?: React.CSSProperties;
+}) {
   return (
-    <div className="square" style={squareStyle} onClick={onClick}>
+    <div className="square" style={style} onClick={onClick}>
       {value}
     </div>
   );
@@ -146,17 +148,16 @@ function Board() {
         Reset
       </button>
       <div style={boardStyle}>
-        {Array.from({ length: BOARD_SIZE }, (_, row) => (
-          <div key={row} className="board-row" style={rowStyle}>
-            {Array.from({ length: BOARD_SIZE }, (_, col) => (
-              <Square
-                key={col}
-                value={board[row][col]}
-                onClick={() => handleClick(row, col)}
-              />
-            ))}
-          </div>
-        ))}
+        {board.flatMap((row, rowI) =>
+          row.map((col, colI) => (
+            <Square
+              key={`${rowI}-${colI}`}
+              value={col}
+              onClick={() => handleClick(rowI, colI)}
+              style={squareStyle}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -171,3 +172,13 @@ export default function App() {
     </div>
   );
 }
+
+// {Array.from({ length: BOARD_SIZE }, (_, row) => (
+//   <div key={row} className="board-row" style={rowStyle}>
+//     {Array.from({ length: BOARD_SIZE }, (_, col) => (
+//       <Square
+//         key={col}
+//         value={board[row][col]}
+//         onClick={() => handleClick(row, col)}
+//       />
+//     ))}
