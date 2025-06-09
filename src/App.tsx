@@ -48,8 +48,62 @@ const buttonStyle = {
   fontSize: "16px",
 };
 
+type Player = "X" | "O" | null | "--";
+type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
+type Board = Player[][];
+
+const startingBoard: Board = Array(3)
+  .fill(null)
+  .map(() => Array(3).fill(null));
+const startingPlayer = "X";
+const startingWinner = "None";
+
+function getWinner(board: Board): Winner {
+  for (let row = 0; row < 3; row++) {
+    const cellRow = board[row][0];
+    if (
+      cellRow !== null &&
+      cellRow !== "--" &&
+      board[row][0] === board[row][1] &&
+      board[row][1] === board[row][2]
+    ) {
+      return cellRow;
+    }
+  }
+
+  for (let col = 0; col < 3; col++) {
+    const cellCol = board[0][col];
+    if (
+      cellCol !== null &&
+      cellCol !== "--" &&
+      board[0][col] === board[1][col] &&
+      board[1][col] === board[2][col]
+    ) {
+      return cellCol;
+    }
+  }
+
+  if (
+    board[0][0] !== null &&
+    board[0][0] !== "--" &&
+    board[0][0] === board[1][1] &&
+    board[1][1] === board[2][2]
+  ) {
+    return board[0][0];
+  }
+  if (
+    board[0][2] !== null &&
+    board[0][2] !== "--" &&
+    board[0][2] === board[1][1] &&
+    board[1][1] === board[2][0]
+  ) {
+    return board[0][2];
+  }
+
+  return "None";
+}
+
 // Components
-type Player = "X" | "O" | null;
 
 function Square({ value, onClick }: { value: Player; onClick: () => void }) {
   return (
@@ -60,39 +114,37 @@ function Square({ value, onClick }: { value: Player; onClick: () => void }) {
 }
 
 function Board() {
-  const [board, setBoard] = useState<Player[][]>([
-    [null, null, null],
-    [null, null, null],
-    [null, null, null],
-  ]);
-  const [isXNext, setIsXNext] = useState(true);
+  const [board, setBoard] = useState<Player[][]>(startingBoard);
+  const [isPlayer, setPlayer] = useState<Player>(startingPlayer);
+  const [isWinner, setWinner] = useState<Winner>(startingWinner);
 
   const handleClick = (row: number, col: number) => {
-    if (board[row][col]) return;
+    if (board[row][col] || isWinner !== "None") return;
+
     const newBoard = board.map((r) => [...r]);
-    newBoard[row][col] = isXNext ? "X" : "O";
+
+    newBoard[row][col] = isPlayer;
     setBoard(newBoard);
-    setIsXNext(!isXNext);
+    setPlayer(isPlayer === "O" ? "X" : "O");
+    const winner: Winner = getWinner(newBoard);
+    setWinner(winner);
+  };
+
+  const handleReset = () => {
+    setBoard(startingBoard);
+    setPlayer(startingPlayer);
+    setWinner(startingWinner);
   };
 
   return (
     <div style={containerStyle} className="gameBoard">
       <div id="statusArea" className="status" style={instructionsStyle}>
-        Next player: <span>{isXNext ? "X" : "O"}</span>
+        Next player: <span>{isPlayer}</span>
       </div>
       <div id="winnerArea" className="winner" style={instructionsStyle}>
-        Winner: <span>None</span>
+        Winner: <span>{isWinner}</span>
       </div>
-      <button
-        style={buttonStyle}
-        onClick={() =>
-          setBoard([
-            [null, null, null],
-            [null, null, null],
-            [null, null, null],
-          ])
-        }
-      >
+      <button style={buttonStyle} onClick={handleReset}>
         Reset
       </button>
       <div style={boardStyle}>
