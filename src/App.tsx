@@ -52,6 +52,8 @@ type Player = "X" | "O" | null | "--";
 type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
+// CONSTANTS
+const BOARD_SIZE = 3;
 const startingBoard: Board = Array(3)
   .fill(null)
   .map(() => Array(3).fill(null));
@@ -59,28 +61,24 @@ const startingPlayer = "X";
 const startingWinner = "None";
 
 function getWinner(board: Board): Winner {
-  for (let row = 0; row < 3; row++) {
-    const cellRow = board[row][0];
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    const firstRowCell = board[row][0];
     if (
-      cellRow !== null &&
-      cellRow !== "--" &&
-      board[row][0] === board[row][1] &&
-      board[row][1] === board[row][2]
-    ) {
-      return cellRow;
-    }
+      firstRowCell !== null &&
+      firstRowCell !== "--" &&
+      board[row].every((cell) => cell === firstRowCell)
+    )
+      return firstRowCell;
   }
 
-  for (let col = 0; col < 3; col++) {
-    const cellCol = board[0][col];
+  for (let col = 0; col < BOARD_SIZE; col++) {
+    const firstColCell = board[0][col];
     if (
-      cellCol !== null &&
-      cellCol !== "--" &&
-      board[0][col] === board[1][col] &&
-      board[1][col] === board[2][col]
-    ) {
-      return cellCol;
-    }
+      firstColCell !== null &&
+      firstColCell !== "--" &&
+      board.every((row) => row[col] === firstColCell)
+    )
+      return firstColCell;
   }
 
   if (
