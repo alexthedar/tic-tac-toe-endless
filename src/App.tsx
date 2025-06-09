@@ -1,31 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 // CONSTANTS
-const BOARD_SIZE = 4;
-const startingBoard: Board = Array(BOARD_SIZE)
+const startingBoardSize = 3;
+const startingBoard: Board = Array(startingBoardSize)
   .fill(null)
-  .map(() => Array(BOARD_SIZE).fill(null));
+  .map(() => Array(startingBoardSize).fill(null));
 const startingPlayer = "X";
 const startingWinner = "None";
+const maxBoardSize = 10;
+const minBoardSize = 3;
 
 // Styles
-
-const squareStyle: React.CSSProperties = {
-  aspectRatio: 1,
-  backgroundColor: "#ddd",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  fontSize: "clamp(16px, 4vw, 24px",
-  color: "white",
-};
-
-const boardStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)`,
-  gap: "4px",
-  width: "min(90vw, 500px",
-};
 
 const containerStyle = {
   display: "flex",
@@ -54,8 +39,36 @@ type Player = "X" | "O" | null | "--";
 type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
-function getWinner(board: Board): Winner {
-  for (let row = 0; row < BOARD_SIZE; row++) {
+function getBoardStyle(boardSize: number): React.CSSProperties {
+  return {
+    display: "grid",
+    gridTemplateColumns: `repeat(${boardSize}, 1fr)`,
+    gap: "4px",
+    width: "min(90vw, 500px)",
+  };
+}
+
+function getSquareStyle(boardSize: number): React.CSSProperties {
+  const fontSize = Math.max(12, Math.floor(160 / boardSize));
+  return {
+    aspectRatio: "1",
+    backgroundColor: "#ddd",
+    fontSize: `${fontSize}px`,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "white",
+  };
+}
+
+function getWinner({
+  board,
+  boardSize,
+}: {
+  board: Board;
+  boardSize: number;
+}): Winner {
+  for (let row = 0; row < boardSize; row++) {
     const firstRowCell = board[row][0];
     if (
       firstRowCell !== null &&
@@ -65,7 +78,7 @@ function getWinner(board: Board): Winner {
       return firstRowCell;
   }
 
-  for (let col = 0; col < BOARD_SIZE; col++) {
+  for (let col = 0; col < boardSize; col++) {
     const firstColCell = board[0][col];
     if (
       firstColCell !== null &&
@@ -83,13 +96,13 @@ function getWinner(board: Board): Winner {
     return board[0][0];
   }
   if (
-    board[0][BOARD_SIZE - 1] !== null &&
-    board[0][BOARD_SIZE - 1] !== "--" &&
+    board[0][boardSize - 1] !== null &&
+    board[0][boardSize - 1] !== "--" &&
     board.every(
-      (row, col) => row[BOARD_SIZE - 1 - col] === board[0][BOARD_SIZE - 1]
+      (row, col) => row[boardSize - 1 - col] === board[0][boardSize - 1]
     )
   ) {
-    return board[0][BOARD_SIZE - 1];
+    return board[0][boardSize - 1];
   }
 
   return "None";
@@ -117,6 +130,13 @@ function Board() {
   const [board, setBoard] = useState<Player[][]>(startingBoard);
   const [isPlayer, setPlayer] = useState<Player>(startingPlayer);
   const [isWinner, setWinner] = useState<Winner>(startingWinner);
+  const [boardSize, setBoardSize] = useState(startingBoardSize);
+
+  useEffect(() => {
+    setBoard(
+      Array.from({ length: boardSize }, () => Array(boardSize).fill(null))
+    );
+  }, [boardSize]);
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || isWinner !== "None") return;
@@ -126,7 +146,7 @@ function Board() {
     newBoard[row][col] = isPlayer;
     setBoard(newBoard);
     setPlayer(isPlayer === "O" ? "X" : "O");
-    const winner: Winner = getWinner(newBoard);
+    const winner: Winner = getWinner({ board: newBoard, boardSize });
     setWinner(winner);
   };
 
@@ -134,6 +154,16 @@ function Board() {
     setBoard(startingBoard);
     setPlayer(startingPlayer);
     setWinner(startingWinner);
+  };
+
+  const handleIncreaseBoard = () => {
+    setBoardSize((prev) => Math.min(prev + 1, maxBoardSize));
+    setBoard(
+      Array.from({ length: boardSize }, () => Array(boardSize).fill(null))
+    );
+  };
+  const handleDecreaseBoard = () => {
+    setBoardSize((prev) => Math.max(prev - 1, minBoardSize));
   };
 
   return (
@@ -144,17 +174,32 @@ function Board() {
       <div id="winnerArea" className="winner" style={instructionsStyle}>
         Winner: <span>{isWinner}</span>
       </div>
-      <button style={buttonStyle} onClick={handleReset}>
-        Reset
-      </button>
-      <div style={boardStyle}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginTop: "16px",
+        }}
+      >
+        <button style={buttonStyle} onClick={handleIncreaseBoard}>
+          +
+        </button>
+        <button style={buttonStyle} onClick={handleReset}>
+          Reset
+        </button>
+        <button style={buttonStyle} onClick={handleDecreaseBoard}>
+          -
+        </button>
+      </div>
+      <div style={getBoardStyle(boardSize)}>
         {board.flatMap((row, rowI) =>
           row.map((col, colI) => (
             <Square
               key={`${rowI}-${colI}`}
               value={col}
               onClick={() => handleClick(rowI, colI)}
-              style={squareStyle}
+              style={getSquareStyle(boardSize)}
             />
           ))
         )}
@@ -172,13 +217,3 @@ export default function App() {
     </div>
   );
 }
-
-// {Array.from({ length: BOARD_SIZE }, (_, row) => (
-//   <div key={row} className="board-row" style={rowStyle}>
-//     {Array.from({ length: BOARD_SIZE }, (_, col) => (
-//       <Square
-//         key={col}
-//         value={board[row][col]}
-//         onClick={() => handleClick(row, col)}
-//       />
-//     ))}
