@@ -69,6 +69,10 @@ function createEmptyBoard(size: number): Player[][] {
   return Array.from({ length: size }, () => Array(size).fill(null));
 }
 
+function isPlayable(cell: Player): cell is Exclude<Player, null | "--"> {
+  return cell !== null && cell !== "--";
+}
+
 function getWinner({
   board,
   boardSize,
@@ -76,14 +80,13 @@ function getWinner({
   board: Board;
   boardSize: number;
 }): Winner {
-  const firstCell = board[0][0];
-  const lastRowCell = board[boardSize - 1][0];
+  const firstBackSlashCell = board[0][0];
+  const firstForwardSlashCell = board[boardSize - 1][0];
 
   for (let row = 0; row < boardSize; row++) {
     const firstRowCell = board[row][0];
     if (
-      firstRowCell !== null &&
-      firstRowCell !== "--" &&
+      isPlayable(firstRowCell) &&
       board[row].every((cell) => cell === firstRowCell)
     )
       return firstRowCell;
@@ -92,27 +95,29 @@ function getWinner({
   for (let col = 0; col < boardSize; col++) {
     const firstColCell = board[0][col];
     if (
-      firstColCell !== null &&
-      firstColCell !== "--" &&
+      isPlayable(firstColCell) &&
       board.every((row) => row[col] === firstColCell)
     )
       return firstColCell;
   }
 
   if (
-    firstCell !== null &&
-    firstCell !== "--" &&
-    board.every((row, col) => row[col] === firstCell)
+    isPlayable(firstBackSlashCell) &&
+    board.every((row, col) => row[col] === firstBackSlashCell)
   ) {
-    return firstCell;
+    return firstBackSlashCell;
   }
   if (
-    lastRowCell !== null &&
-    lastRowCell !== "--" &&
-    board.every((row, col) => row[boardSize - 1 - col] === lastRowCell)
+    isPlayable(firstForwardSlashCell) &&
+    board.every(
+      (row, col) => row[boardSize - 1 - col] === firstForwardSlashCell
+    )
   ) {
-    return lastRowCell;
+    return firstForwardSlashCell;
   }
+
+  const allFilled = board.flat().every((cell) => isPlayable(cell));
+  if (allFilled) return "Draw";
 
   return "None";
 }
