@@ -53,10 +53,10 @@ type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
 // CONSTANTS
-const BOARD_SIZE = 3;
-const startingBoard: Board = Array(3)
+const BOARD_SIZE = 4;
+const startingBoard: Board = Array(BOARD_SIZE)
   .fill(null)
-  .map(() => Array(3).fill(null));
+  .map(() => Array(BOARD_SIZE).fill(null));
 const startingPlayer = "X";
 const startingWinner = "None";
 
@@ -146,9 +146,9 @@ function Board() {
         Reset
       </button>
       <div style={boardStyle}>
-        {[0, 1, 2].map((row) => (
+        {Array.from({ length: BOARD_SIZE }, (_, row) => (
           <div key={row} className="board-row" style={rowStyle}>
-            {[0, 1, 2].map((col) => (
+            {Array.from({ length: BOARD_SIZE }, (_, col) => (
               <Square
                 key={col}
                 value={board[row][col]}
