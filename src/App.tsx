@@ -14,6 +14,7 @@ const startingStats = {
   O: 0,
   Draw: 0,
 };
+const startingGameOverFlag = false;
 
 // Styles
 
@@ -175,31 +176,33 @@ function Board() {
   const [isWinner, setWinner] = useState<Winner>(startingWinner);
   const [boardSize, setBoardSize] = useState(startingBoardSize);
   const [stats, setStats] = useState(startingStats);
-  console.log("🚀 ~ Board ~ stats:", stats);
+  const [isGameOver, setGameOver] = useState(startingGameOverFlag);
 
   useEffect(() => {
     setBoard(createEmptyBoard(boardSize));
   }, [boardSize]);
 
   const handleClick = (row: number, col: number) => {
-    if (board[row][col] || isWinner !== "None") return;
+    if (board[row][col] || isGameOver) return;
     const newBoard = board.map((r) => [...r]);
     newBoard[row][col] = isPlayer;
     setBoard(newBoard);
     const winner: Winner = getWinner({ board: newBoard, boardSize });
-    setWinner(winner);
-    let player: Player = isPlayer === "O" ? "X" : "O";
     if (winner === "X" || winner === "O" || winner === "Draw") {
-      player = "--";
+      setWinner(winner);
+      setPlayer("--");
       setStats((prev) => ({ ...prev, [winner]: prev[winner] + 1 }));
+      setGameOver(true);
+    } else {
+      setPlayer(isPlayer === "O" ? "X" : "O");
     }
-    setPlayer(player);
   };
 
   const handleReset = () => {
     setBoard(createEmptyBoard(boardSize));
     setPlayer(startingPlayer);
     setWinner(startingWinner);
+    setGameOver(false);
   };
 
   const handleIncreaseBoard = () => {
