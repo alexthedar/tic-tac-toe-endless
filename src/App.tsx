@@ -30,6 +30,17 @@ const instructionsStyle = {
   fontSize: "16px",
 };
 
+const winnerStyle = {
+  ...instructionsStyle,
+  minWidth: "120px",
+  textAlign: "left" as const,
+};
+const nextPlayerStyle = {
+  ...instructionsStyle,
+  minWidth: "120px",
+  textAlign: "right" as const,
+};
+
 const buttonStyle = {
   marginTop: "15px",
   marginBottom: "16px",
@@ -58,7 +69,7 @@ function getCalculatedStyles(boardSize: number) {
   const boardStyle = {
     display: "grid",
     gridTemplateColumns: `repeat(${boardSize}, 1fr)`,
-    gap: "0.5vw",
+    gap: `${Math.min(1, 3 / boardSize)}vw`,
     width: `${boardWidth}vw`,
   };
   const squareStyle = {
@@ -75,7 +86,6 @@ function getCalculatedStyles(boardSize: number) {
     justifyContent: "space-between",
     alignItems: "center",
     gap: "8px",
-    marginTop: "16px",
     width: `${boardWidth}vw`,
   };
   return {
@@ -173,17 +183,17 @@ function Board() {
 
   const handleClick = (row: number, col: number) => {
     if (board[row][col] || isWinner !== "None") return;
-
     const newBoard = board.map((r) => [...r]);
-
     newBoard[row][col] = isPlayer;
     setBoard(newBoard);
-    setPlayer(isPlayer === "O" ? "X" : "O");
     const winner: Winner = getWinner({ board: newBoard, boardSize });
     setWinner(winner);
+    let player: Player = isPlayer === "O" ? "X" : "O";
     if (winner === "X" || winner === "O" || winner === "Draw") {
+      player = "--";
       setStats((prev) => ({ ...prev, [winner]: prev[winner] + 1 }));
     }
+    setPlayer(player);
   };
 
   const handleReset = () => {
@@ -204,9 +214,15 @@ function Board() {
   return (
     <div style={containerStyle} className="gameBoard">
       <div style={calculatedStyles.controlsWrapperStyle}>
-        <div id="statusArea" className="status" style={instructionsStyle}>
-          Next player: <span>{isPlayer}</span>
+        <div style={instructionsStyle}>X Wins: {stats.X}</div>
+        <div style={instructionsStyle}>Draws: {stats.Draw}</div>
+        <div style={instructionsStyle}>O Wins: {stats.O}</div>
+      </div>
+      <div style={calculatedStyles.controlsWrapperStyle}>
+        <div id="winnerArea" className="winner" style={winnerStyle}>
+          Winner: <span>{isWinner}</span>
         </div>
+
         <div style={buttonGroupStyle}>
           <button style={buttonStyle} onClick={handleIncreaseBoard}>
             +
@@ -218,8 +234,8 @@ function Board() {
             -
           </button>
         </div>
-        <div id="winnerArea" className="winner" style={instructionsStyle}>
-          Winner: <span>{isWinner}</span>
+        <div id="statusArea" className="status" style={nextPlayerStyle}>
+          Next player: <span>{isPlayer}</span>
         </div>
       </div>
       <div style={calculatedStyles.boardStyle}>
