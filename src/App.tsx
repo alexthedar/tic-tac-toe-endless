@@ -9,6 +9,11 @@ const startingPlayer = "X";
 const startingWinner = "None";
 const maxBoardSize = 10;
 const minBoardSize = 3;
+const startingStats = {
+  X: 0,
+  O: 0,
+  Draw: 0,
+};
 
 // Styles
 
@@ -35,33 +40,48 @@ const buttonStyle = {
   fontSize: "16px",
 };
 
+const buttonGroupStyle = {
+  display: "flex",
+  gap: "6px",
+};
+
 // Types
 type Player = "X" | "O" | null | "--";
 type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
-function getBoardStyle(boardSize: number): React.CSSProperties {
-  const s = boardSize * 2 + 50;
-  return {
+// helpers
+function getCalculatedStyles(boardSize: number) {
+  const boardWidth = boardSize * 2 + 50;
+  const squareVW = boardWidth / boardSize;
+
+  const boardStyle = {
     display: "grid",
     gridTemplateColumns: `repeat(${boardSize}, 1fr)`,
-    gap: "4px",
-
-    width: `min(${s}vw)`,
+    gap: "0.5vw",
+    width: `${boardWidth}vw`,
   };
-}
-
-// helpers
-function getSquareStyle(boardSize: number): React.CSSProperties {
-  const fontSize = Math.max(12, Math.floor(160 / boardSize));
-  return {
+  const squareStyle = {
     aspectRatio: "1",
     backgroundColor: "#ddd",
-    fontSize: `${fontSize}px`,
+    fontSize: `${squareVW * 0.5}vw`,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     color: "white",
+  };
+  const controlsWrapperStyle = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "8px",
+    marginTop: "16px",
+    width: `${boardWidth}vw`,
+  };
+  return {
+    boardStyle,
+    squareStyle,
+    controlsWrapperStyle,
   };
 }
 
@@ -144,6 +164,8 @@ function Board() {
   const [isPlayer, setPlayer] = useState<Player>(startingPlayer);
   const [isWinner, setWinner] = useState<Winner>(startingWinner);
   const [boardSize, setBoardSize] = useState(startingBoardSize);
+  const [stats, setStats] = useState(startingStats);
+  console.log("🚀 ~ Board ~ stats:", stats);
 
   useEffect(() => {
     setBoard(createEmptyBoard(boardSize));
@@ -159,6 +181,9 @@ function Board() {
     setPlayer(isPlayer === "O" ? "X" : "O");
     const winner: Winner = getWinner({ board: newBoard, boardSize });
     setWinner(winner);
+    if (winner === "X" || winner === "O" || winner === "Draw") {
+      setStats((prev) => ({ ...prev, [winner]: prev[winner] + 1 }));
+    }
   };
 
   const handleReset = () => {
@@ -174,40 +199,37 @@ function Board() {
     setBoardSize((prev) => Math.max(prev - 1, minBoardSize));
   };
 
+  const calculatedStyles = getCalculatedStyles(boardSize);
+
   return (
     <div style={containerStyle} className="gameBoard">
-      <div id="statusArea" className="status" style={instructionsStyle}>
-        Next player: <span>{isPlayer}</span>
+      <div style={calculatedStyles.controlsWrapperStyle}>
+        <div id="statusArea" className="status" style={instructionsStyle}>
+          Next player: <span>{isPlayer}</span>
+        </div>
+        <div style={buttonGroupStyle}>
+          <button style={buttonStyle} onClick={handleIncreaseBoard}>
+            +
+          </button>
+          <button style={buttonStyle} onClick={handleReset}>
+            Reset
+          </button>
+          <button style={buttonStyle} onClick={handleDecreaseBoard}>
+            -
+          </button>
+        </div>
+        <div id="winnerArea" className="winner" style={instructionsStyle}>
+          Winner: <span>{isWinner}</span>
+        </div>
       </div>
-      <div id="winnerArea" className="winner" style={instructionsStyle}>
-        Winner: <span>{isWinner}</span>
-      </div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          marginTop: "16px",
-        }}
-      >
-        <button style={buttonStyle} onClick={handleIncreaseBoard}>
-          +
-        </button>
-        <button style={buttonStyle} onClick={handleReset}>
-          Reset
-        </button>
-        <button style={buttonStyle} onClick={handleDecreaseBoard}>
-          -
-        </button>
-      </div>
-      <div style={getBoardStyle(boardSize)}>
+      <div style={calculatedStyles.boardStyle}>
         {board.flatMap((row, rowI) =>
           row.map((col, colI) => (
             <Square
               key={`${rowI}-${colI}`}
               value={col}
               onClick={() => handleClick(rowI, colI)}
-              style={getSquareStyle(boardSize)}
+              style={calculatedStyles.squareStyle}
             />
           ))
         )}
