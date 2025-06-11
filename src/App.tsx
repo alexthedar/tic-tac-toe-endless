@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { supabase } from "./supabaseClient";
 
 // CONSTANTS
 const startingBoardSize = 3;
@@ -15,6 +16,8 @@ const startingStats = {
   Draw: 0,
 };
 const startingGameOverFlag = false;
+const defaultIsLoadingState = false;
+const defaultHasGameStarted = false;
 
 // Styles
 
@@ -63,7 +66,13 @@ type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
 // helpers
-function getCalculatedStyles(boardSize: number) {
+function getCalculatedStyles({
+  boardSize,
+  isLoading,
+}: {
+  boardSize: number;
+  isLoading: boolean;
+}) {
   const boardWidth = boardSize * 2 + 50;
   const squareVW = boardWidth / boardSize;
 
@@ -81,6 +90,12 @@ function getCalculatedStyles(boardSize: number) {
     alignItems: "center",
     justifyContent: "center",
     color: "white",
+    transition: "opacity 0.2s ease",
+    opacity: isLoading ? 0.4 : 1,
+    cursor: isLoading ? "not-allowed" : "pointer",
+    pointerEvents: isLoading
+      ? "none"
+      : ("auto" as React.CSSProperties["pointerEvents"]),
   };
   const controlsWrapperStyle = {
     display: "flex",
@@ -175,15 +190,66 @@ function Board() {
   const [isPlayer, setPlayer] = useState<Player>(startingPlayer);
   const [isWinner, setWinner] = useState<Winner>(startingWinner);
   const [boardSize, setBoardSize] = useState(startingBoardSize);
-  const [stats, setStats] = useState(startingStats);
   const [isGameOver, setGameOver] = useState(startingGameOverFlag);
+  const [stats, setStats] = useState(startingStats);
+  const [isLoading, setIsLoading] = useState(defaultIsLoadingState);
+  const [hasGameStarted, setHasGameStarted] = useState(defaultHasGameStarted);
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from("stats")
+          .select("X, O, Draw");
+
+        if (error) {
+          console.error("Supabase error loading stats:", error);
+          return;
+        }
+
+        if (data && data.length) {
+          const aggregated = data.reduce(
+            (acc, row) => ({
+              X: acc.X + (row.X || 0),
+              O: acc.O + (row.O || 0),
+              Draw: acc.Draw + (row.Draw || 0),
+            }),
+            { X: 0, O: 0, Draw: 0 }
+          );
+          setStats(aggregated);
+        }
+      } catch (err) {
+        console.error("Unexpected error loading stats:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadStats();
+  }, []);
 
   useEffect(() => {
     setBoard(createEmptyBoard(boardSize));
   }, [boardSize]);
 
-  const handleClick = (row: number, col: number) => {
+  const clearStats = async () => {
+    setIsLoading(true);
+    try {
+      await supabase.from("stats").delete().neq("id", "");
+      setStats(startingStats);
+    } catch (error) {
+      console.error("Error clearing stats:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClick = async (row: number, col: number) => {
     if (board[row][col] || isGameOver) return;
+    if (!hasGameStarted) {
+      setHasGameStarted(true);
+    }
     const newBoard = board.map((r) => [...r]);
     newBoard[row][col] = isPlayer;
     setBoard(newBoard);
@@ -193,16 +259,36 @@ function Board() {
       setPlayer("--");
       setStats((prev) => ({ ...prev, [winner]: prev[winner] + 1 }));
       setGameOver(true);
+      try {
+        setIsLoading(true);
+        await supabase.from("stats").insert([
+          {
+            X: winner === "X" ? 1 : 0,
+            O: winner === "O" ? 1 : 0,
+            Draw: winner === "Draw" ? 1 : 0,
+          },
+        ]);
+      } catch (error: unknown) {
+        console.error("Failed to insert stats:", error);
+      } finally {
+        setIsLoading(false);
+      }
     } else {
       setPlayer(isPlayer === "O" ? "X" : "O");
     }
   };
 
-  const handleReset = () => {
+  const handleNewGame = () => {
     setBoard(createEmptyBoard(boardSize));
     setPlayer(startingPlayer);
     setWinner(startingWinner);
     setGameOver(false);
+    setHasGameStarted(false);
+  };
+
+  const handleReset = () => {
+    clearStats();
+    handleNewGame();
   };
 
   const handleIncreaseBoard = () => {
@@ -212,10 +298,24 @@ function Board() {
     setBoardSize((prev) => Math.max(prev - 1, minBoardSize));
   };
 
-  const calculatedStyles = getCalculatedStyles(boardSize);
+  const calculatedStyles = getCalculatedStyles({ boardSize, isLoading });
 
   return (
     <div style={containerStyle} className="gameBoard">
+      {isLoading && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.2)",
+            zIndex: 10,
+          }}
+        />
+      )}
+
       <div style={calculatedStyles.controlsWrapperStyle}>
         <div style={instructionsStyle}>X Wins: {stats.X}</div>
         <div style={instructionsStyle}>Draws: {stats.Draw}</div>
@@ -227,15 +327,31 @@ function Board() {
         </div>
 
         <div style={buttonGroupStyle}>
-          <button style={buttonStyle} onClick={handleIncreaseBoard}>
-            +
-          </button>
-          <button style={buttonStyle} onClick={handleReset}>
-            Reset
-          </button>
-          <button style={buttonStyle} onClick={handleDecreaseBoard}>
-            -
-          </button>
+          {["+", "New", "Reset", "-"].map((label) => {
+            if (label === "New" || !hasGameStarted || isLoading) {
+              const onClick = {
+                "+": handleIncreaseBoard,
+                "-": handleDecreaseBoard,
+                New: handleNewGame,
+                Reset: handleReset,
+              }[label];
+
+              return (
+                <button
+                  key={label}
+                  disabled={
+                    isLoading ||
+                    (hasGameStarted && (label === "+" || label === "-"))
+                  }
+                  style={buttonStyle}
+                  onClick={onClick}
+                >
+                  {label}
+                </button>
+              );
+            }
+            return null;
+          })}
         </div>
         <div id="statusArea" className="status" style={nextPlayerStyle}>
           Next player: <span>{isPlayer}</span>
