@@ -66,6 +66,29 @@ type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
 
 // helpers
+async function createRoom(boardSize: number): Promise<string | null> {
+  const board = createEmptyBoard(boardSize);
+
+  const { data, error } = await supabase
+    .from("rooms")
+    .insert([
+      {
+        board_state: board,
+        board_size: boardSize,
+        current_turn: "X",
+      },
+    ])
+    .select("code")
+    .single();
+
+  if (error) {
+    console.error("Error creating room:", error);
+    return null;
+  }
+
+  return data.code;
+}
+
 function getCalculatedStyles({
   boardSize,
   isLoading,
@@ -245,6 +268,18 @@ function Board() {
     }
   };
 
+  const handleCreateRoom = async () => {
+    setIsLoading(true);
+    const code = await createRoom(boardSize);
+    setIsLoading(false);
+
+    if (code) {
+      alert(`Room created! Share this code: ${code}`);
+    } else {
+      alert("Failed to create room.");
+    }
+  };
+
   const handleClick = async (row: number, col: number) => {
     if (board[row][col] || isGameOver) return;
     if (!hasGameStarted) {
@@ -285,6 +320,9 @@ function Board() {
     setGameOver(false);
     setHasGameStarted(false);
   };
+
+  const handleHostRoom = () => {};
+  const handleJoinGame = () => {};
 
   const handleReset = () => {
     clearStats();
@@ -327,12 +365,13 @@ function Board() {
         </div>
 
         <div style={buttonGroupStyle}>
-          {["+", "New", "Reset", "-"].map((label) => {
-            if (label === "New" || !hasGameStarted || isLoading) {
+          {["+", "Host", "Join", "Reset", "-"].map((label) => {
+            if (label === "Reset" || !hasGameStarted || isLoading) {
               const onClick = {
                 "+": handleIncreaseBoard,
                 "-": handleDecreaseBoard,
-                New: handleNewGame,
+                Host: handleHostRoom,
+                Join: handleJoinGame,
                 Reset: handleReset,
               }[label];
 
