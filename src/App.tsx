@@ -17,7 +17,6 @@ const startingStats = {
 };
 const startingGameOverFlag = false;
 const defaultIsLoadingState = false;
-const defaultHasGameStarted = false;
 
 // Styles
 
@@ -57,6 +56,8 @@ const buttonStyle = {
 
 const buttonGroupStyle = {
   display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
   gap: "6px",
 };
 
@@ -64,9 +65,35 @@ const buttonGroupStyle = {
 type Player = "X" | "O" | null | "--";
 type Winner = Exclude<Player, null | "--"> | "Draw" | "None";
 type Board = Player[][];
+type Room = {
+  code: string;
+  board_state: Board;
+  board_size: number;
+  current_turn: Player | null;
+  is_game_over: boolean;
+  winner: Winner | null;
+  player_x: string | null;
+  player_o: string | null;
+};
 
 // helpers
-async function createRoom(boardSize: number): Promise<string | null> {
+function getOrCreatePlayerId() {
+  const key = "tictactoe-player-id";
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+async function createRoom({
+  boardSize,
+  playerId,
+}: {
+  boardSize: number;
+  playerId: string;
+}): Promise<string | null> {
   const board = createEmptyBoard(boardSize);
 
   const { data, error } = await supabase
@@ -76,6 +103,7 @@ async function createRoom(boardSize: number): Promise<string | null> {
         board_state: board,
         board_size: boardSize,
         current_turn: "X",
+        player_x: playerId,
       },
     ])
     .select("code")
@@ -209,6 +237,7 @@ function Square({
 }
 
 function Board() {
+  const playerId = getOrCreatePlayerId();
   const [board, setBoard] = useState<Player[][]>(startingBoard);
   const [isPlayer, setPlayer] = useState<Player>(startingPlayer);
   const [isWinner, setWinner] = useState<Winner>(startingWinner);
@@ -216,7 +245,36 @@ function Board() {
   const [isGameOver, setGameOver] = useState(startingGameOverFlag);
   const [stats, setStats] = useState(startingStats);
   const [isLoading, setIsLoading] = useState(defaultIsLoadingState);
-  const [hasGameStarted, setHasGameStarted] = useState(defaultHasGameStarted);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
+
+  useEffect(() => {
+    if (!roomCode) return;
+
+    const channel = supabase
+      .channel(`room-${roomCode}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "rooms",
+          filter: `code=eq.${roomCode}`,
+        },
+        (payload) => {
+          const updated = payload.new;
+          setBoard(updated.board_state);
+          setBoardSize(updated.board_size);
+          setPlayer(updated.current_turn || "--");
+          setWinner(updated.winner || "None");
+          setGameOver(updated.is_game_over);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomCode]);
 
   useEffect(() => {
     async function loadStats() {
@@ -268,65 +326,129 @@ function Board() {
     }
   };
 
-  const handleCreateRoom = async () => {
-    setIsLoading(true);
-    const code = await createRoom(boardSize);
-    setIsLoading(false);
-
-    if (code) {
-      alert(`Room created! Share this code: ${code}`);
-    } else {
-      alert("Failed to create room.");
-    }
-  };
-
   const handleClick = async (row: number, col: number) => {
-    if (board[row][col] || isGameOver) return;
-    if (!hasGameStarted) {
-      setHasGameStarted(true);
-    }
+    if (!roomCode || board[row][col] || isGameOver) return;
+    if (
+      (isPlayer === "X" && room?.player_x !== playerId) ||
+      (isPlayer === "O" && room?.player_o !== playerId)
+    )
+      return;
+
     const newBoard = board.map((r) => [...r]);
     newBoard[row][col] = isPlayer;
-    setBoard(newBoard);
+
     const winner: Winner = getWinner({ board: newBoard, boardSize });
-    if (winner === "X" || winner === "O" || winner === "Draw") {
+    const nextTurn: Player = isPlayer === "X" ? "O" : "X";
+    const gameOver = winner !== "None";
+
+    setIsLoading(true);
+    try {
+      await supabase
+        .from("rooms")
+        .update({
+          board_state: newBoard,
+          current_turn: gameOver ? null : nextTurn,
+          winner: gameOver ? winner : null,
+          is_game_over: gameOver,
+        })
+        .eq("code", roomCode);
+      setBoard(newBoard);
+      setPlayer(gameOver ? "--" : nextTurn);
       setWinner(winner);
-      setPlayer("--");
-      setStats((prev) => ({ ...prev, [winner]: prev[winner] + 1 }));
-      setGameOver(true);
-      try {
-        setIsLoading(true);
-        await supabase.from("stats").insert([
-          {
-            X: winner === "X" ? 1 : 0,
-            O: winner === "O" ? 1 : 0,
-            Draw: winner === "Draw" ? 1 : 0,
-          },
-        ]);
-      } catch (error: unknown) {
-        console.error("Failed to insert stats:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      setPlayer(isPlayer === "O" ? "X" : "O");
+      setGameOver(gameOver);
+    } catch (error) {
+      console.error("Failed to update move:", error);
     }
   };
 
-  const handleNewGame = () => {
-    setBoard(createEmptyBoard(boardSize));
-    setPlayer(startingPlayer);
-    setWinner(startingWinner);
-    setGameOver(false);
-    setHasGameStarted(false);
-  };
+  const handleHostRoom = async () => {
+    setIsLoading(true);
+    const roomCode = await createRoom({ boardSize, playerId });
+    if (!roomCode) {
+      alert("Failed to create room code");
+      setIsLoading(false);
+      return;
+    }
 
-  const handleHostRoom = () => {};
-  const handleJoinGame = () => {};
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("code", roomCode)
+      .single();
+
+    if (error || !data) {
+      alert("Failed to load room after creation.");
+      console.error("Room fetch error:", error);
+      setIsLoading(false);
+      return;
+    }
+
+    setBoard(data.board_state);
+    setBoardSize(data.board_size);
+    setPlayer("X");
+    setWinner(data.winner || "None");
+    setGameOver(data.is_game_over);
+    setRoomCode(roomCode);
+    setIsLoading(false);
+    setRoom(data as Room);
+    alert(`Room created. Share code: ${roomCode}`);
+  };
+  const handleJoinGame = async () => {
+    const code = prompt("Enter 6-character room code:");
+    if (!code) return;
+
+    setIsLoading(true);
+
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("*")
+      .eq("code", code)
+      .single();
+
+    if (error || !data) {
+      alert("Room not found.");
+      console.error("Join error:", error);
+      setIsLoading(false);
+      return;
+    }
+
+    const updateField =
+      data.player_x === null || data.player_x === playerId
+        ? "player_x"
+        : data.player_o === null || data.player_o === playerId
+        ? "player_o"
+        : null;
+
+    if (!updateField) {
+      alert("Room is full");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      await supabase
+        .from("rooms")
+        .update({ [updateField]: playerId })
+        .eq("code", code);
+      const mySymbol = updateField === "player_x" ? "X" : "O";
+      setBoard(data.board_state);
+      setBoardSize(data.board_size);
+      setPlayer(mySymbol);
+      setWinner(data.winner || "None");
+      setGameOver(data.is_game_over);
+      setRoomCode(code);
+      setRoom({ ...data, [updateField]: playerId } as Room);
+      setIsLoading(false);
+    } catch (error) {
+      alert("Failed to join room.");
+      console.error("Join update error:", error);
+      setIsLoading(false);
+    }
+  };
 
   const handleReset = () => {
     clearStats();
-    handleNewGame();
+    // handleNewGame();
   };
 
   const handleIncreaseBoard = () => {
@@ -355,46 +477,67 @@ function Board() {
       )}
 
       <div style={calculatedStyles.controlsWrapperStyle}>
-        <div style={instructionsStyle}>X Wins: {stats.X}</div>
-        <div style={instructionsStyle}>Draws: {stats.Draw}</div>
-        <div style={instructionsStyle}>O Wins: {stats.O}</div>
-      </div>
-      <div style={calculatedStyles.controlsWrapperStyle}>
+        <div style={instructionsStyle}>
+          You are: <strong>{playerId}</strong> (
+          {room?.player_x === playerId
+            ? "X"
+            : room?.player_o === playerId
+            ? "O"
+            : "Spectator"}
+          )
+        </div>
+        <div style={instructionsStyle}>
+          {isGameOver
+            ? "Game over"
+            : room &&
+              (room.current_turn === (room.player_x === playerId ? "X" : "O")
+                ? "Your turn"
+                : "Waiting for opponent")}
+        </div>
         <div id="winnerArea" className="winner" style={winnerStyle}>
           Winner: <span>{isWinner}</span>
         </div>
-
-        <div style={buttonGroupStyle}>
-          {["+", "Host", "Join", "Reset", "-"].map((label) => {
-            if (label === "Reset" || !hasGameStarted || isLoading) {
-              const onClick = {
-                "+": handleIncreaseBoard,
-                "-": handleDecreaseBoard,
-                Host: handleHostRoom,
-                Join: handleJoinGame,
-                Reset: handleReset,
-              }[label];
-
-              return (
-                <button
-                  key={label}
-                  disabled={
-                    isLoading ||
-                    (hasGameStarted && (label === "+" || label === "-"))
-                  }
-                  style={buttonStyle}
-                  onClick={onClick}
-                >
-                  {label}
-                </button>
-              );
-            }
-            return null;
-          })}
-        </div>
+        <div style={instructionsStyle}>Room: {roomCode}</div>
         <div id="statusArea" className="status" style={nextPlayerStyle}>
           Next player: <span>{isPlayer}</span>
         </div>
+      </div>
+      <div style={calculatedStyles.controlsWrapperStyle}>
+        <div style={instructionsStyle}>Player: PLAYER ID is X</div>
+        {/* <div style={instructionsStyle}>Wins: {stats.Wins}</div> */}
+        <div style={instructionsStyle}>Draws: {stats.Draw}</div>
+        {/* <div style={instructionsStyle}>Loss: {stats.Loss}</div> */}
+      </div>
+      <div style={calculatedStyles.controlsWrapperStyle}>
+        <div style={instructionsStyle}>Player: PLAYER ID is O</div>
+        {/* <div style={instructionsStyle}>Wins: {stats.Wins}</div> */}
+        <div style={instructionsStyle}>Draws: {stats.Draw}</div>
+        {/* <div style={instructionsStyle}>Loss: {stats.Loss}</div> */}
+      </div>
+      <div style={buttonGroupStyle}>
+        {["+", "Host", "Join", "Reset", "-"].map((label) => {
+          if (label === "Reset" || !isLoading) {
+            const onClick = {
+              "+": handleIncreaseBoard,
+              "-": handleDecreaseBoard,
+              Host: handleHostRoom,
+              Join: handleJoinGame,
+              Reset: handleReset,
+            }[label];
+
+            return (
+              <button
+                key={label}
+                disabled={isLoading || label === "+" || label === "-"}
+                style={buttonStyle}
+                onClick={onClick}
+              >
+                {label}
+              </button>
+            );
+          }
+          return null;
+        })}
       </div>
       <div style={calculatedStyles.boardStyle}>
         {board.flatMap((row, rowI) =>
