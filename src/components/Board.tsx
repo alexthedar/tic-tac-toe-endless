@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import type { Player, Winner, Room } from "../types/game";
 import { supabase } from "../utils/supabase";
 import { getWinner } from "../utils/getWinner";
+import { createEmptyBoard } from "../utils/createEmptyBoard";
 import {
   startingBoard,
   startingPlayer,
@@ -94,6 +95,35 @@ export function Board() {
     }
   };
 
+  const handleNewGame = async () => {
+    if (!roomCode) return;
+    setIsLoading(true);
+    try {
+      const { data: updatedRoom, error } = await supabase
+        .from("rooms")
+        .update({
+          board_state: createEmptyBoard(boardSize),
+          winner: "None",
+          is_game_over: false,
+          current_turn: "X",
+        })
+        .eq("code", roomCode)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Manually trigger a UI update with the fresh data from the database
+      updateLocalStateFromRoom(updatedRoom);
+    } catch (error) {
+      console.error("Failed to start new game:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleHost = () => handleHostRoom(boardSize);
   const handleIncreaseBoard = () =>
     setBoardSize((prev) => Math.min(prev + 1, maxBoardSize));
@@ -118,11 +148,11 @@ export function Board() {
       <GameControls
         onHost={handleHost}
         onJoin={handleJoinRoom}
-        onReset={() => {}}
+        onReset={handleNewGame}
         onIncrease={handleIncreaseBoard}
         onDecrease={handleDecreaseBoard}
         isLoading={isLoading}
-      />
+      />{" "}
       <GameGrid
         board={board}
         onClick={handleClick}

@@ -19,20 +19,20 @@ export function GameControls({
 }: GameControlsProps) {
   return (
     <div style={buttonGroupStyle}>
-      <button onClick={onIncrease} disabled={isLoading} style={buttonStyle}>
-        +
-      </button>
-      <button onClick={onHost} disabled={isLoading} style={buttonStyle}>
+      <button style={buttonStyle} onClick={onHost} disabled={isLoading}>
         Host
       </button>
-      <button onClick={onJoin} disabled={isLoading} style={buttonStyle}>
+      <button style={buttonStyle} onClick={onJoin} disabled={isLoading}>
         Join
       </button>
-      <button onClick={onReset} disabled={isLoading} style={buttonStyle}>
-        Reset
+      <button style={buttonStyle} onClick={onIncrease} disabled={isLoading}>
+        +
       </button>
-      <button onClick={onDecrease} disabled={isLoading} style={buttonStyle}>
+      <button style={buttonStyle} onClick={onDecrease} disabled={isLoading}>
         -
+      </button>
+      <button style={buttonStyle} onClick={onReset} disabled={isLoading}>
+        Reset
       </button>
     </div>
   );
