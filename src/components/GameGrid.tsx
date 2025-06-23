@@ -1,3 +1,4 @@
+// components/GameGrid.tsx
 import { Square } from "./Square";
 import type { Player } from "../types/game";
 
