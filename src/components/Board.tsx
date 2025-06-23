@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Player, Winner, Room } from "../types/game";
 import { supabase } from "../utils/supabase";
 import { getWinner } from "../utils/getWinner";
@@ -44,17 +44,19 @@ export function Board() {
       setIsLoading,
     });
 
+  const handleSubscriptionUpdate = useCallback((updated: Partial<Room>) => {
+    if (!updated) return;
+    if (updated.board_state) setBoard(updated.board_state);
+    if (updated.board_size) setBoardSize(updated.board_size);
+    if (updated.current_turn) setPlayer(updated.current_turn);
+    if (updated.winner) setWinner(updated.winner);
+    if (typeof updated.is_game_over === "boolean")
+      setGameOver(updated.is_game_over);
+  }, []);
+
   useRoomSubscription({
     roomCode,
-    onUpdate: (updated) => {
-      if (!updated) return;
-      if (updated.board_state) setBoard(updated.board_state);
-      if (updated.board_size) setBoardSize(updated.board_size);
-      if (updated.current_turn) setPlayer(updated.current_turn);
-      if (updated.winner) setWinner(updated.winner);
-      if (typeof updated.is_game_over === "boolean")
-        setGameOver(updated.is_game_over);
-    },
+    onUpdate: handleSubscriptionUpdate,
   });
 
   useEffect(() => {
