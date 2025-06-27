@@ -4,7 +4,11 @@ A responsive, dynamic Tic Tac Toe game built with React + TypeScript. Supports i
 
 ---
 
-https://github.com/user-attachments/assets/3cf47965-0a4c-4292-a893-e90ad23d3a78
+
+
+
+
+https://github.com/user-attachments/assets/dc560e06-a2dd-4c72-84ff-c501dae87a5c
 
 
 ---
